@@ -1,11 +1,12 @@
-from battleships.ai import AIState, RandomState
-from common import clear
 from enum import Enum
-from types import UnionType
-from typing import Optional, Type, Iterator, Self
-from vec2 import Vec2, vec_scalar_multiply, vec_add, vec_invert
 from random import randint, choice
 from time import sleep
+from types import UnionType
+from typing import Optional, Type
+
+from battleships.ai import AIState, RandomState
+from common import clear
+from vec2 import Vec2, vec_scalar_multiply, vec_add
 
 
 class User:

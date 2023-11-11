@@ -1,6 +1,7 @@
 import unittest
-from vec2 import Vec2
+
 from battleships.battleships import SquareState, new_board, decode_notation
+from vec2 import Vec2
 
 
 class MyTestCase(unittest.TestCase):

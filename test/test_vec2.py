@@ -1,4 +1,5 @@
 import unittest
+
 from vec2 import Vec2, vec_add, vec_invert
 
 
