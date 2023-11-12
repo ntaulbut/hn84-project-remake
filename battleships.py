@@ -1,12 +1,12 @@
 from enum import Enum
+from os import system
 from random import randint, choice
+from sys import platform
 from time import sleep
 from types import UnionType
-from typing import Optional, Type
+from typing import Optional, Type, Iterator, Self
 
-from battleships.ai import AIState, RandomState
-from common import clear
-from vec2 import Vec2, vec_scalar_multiply, vec_add
+from vec2 import Vec2, vec_scalar_multiply, vec_add, vec_invert
 
 
 class User:
@@ -48,7 +48,7 @@ class SquareState(Enum):
 
 
 class KnowledgeSquareState(Enum):
-    UNKNOWN = " "
+    UNKNOWN = 2
     MISS = "·"
     HIT = "X"
 
@@ -62,6 +62,13 @@ SHIP_LENGTHS = [5, 4, 3, 3, 2]
 MainBoard: Type = list[list[SquareState]]
 KnowledgeBoard: Type = list[list[KnowledgeSquareState]]
 Board: UnionType = MainBoard | KnowledgeBoard
+
+
+def clear() -> None:
+    if platform == "win32":
+        _ = system("cls")
+    else:
+        _ = system("clear")
 
 
 def new_board(default, height, width) -> Board:
@@ -171,23 +178,105 @@ def random_square(board: Board, matching: SquareState | KnowledgeSquareState) ->
     board_height = len(board)
     board_width = len(board[0])
     for _ in range(LOOP_MAX):
-        coord = Vec2(randint(0, board_width - 1), randint(0, board_height - 1))
-        if board[coord.y][coord.x] == matching:
+        coord = Vec2(randint(0, board_height - 1), randint(0, board_width - 1))
+        print(board[coord.y][coord.x], matching)
+        print(board[coord.y][coord.x] is matching)
+        if board[coord.y][coord.x] is matching:
             return coord
-    exit(1)
+    exit(200)
+
+
+class State:
+    def update(self, user: User, player: User) -> Optional[Self]:
+        pass
+
+
+class RandomState(State):
+    def update(self, user: User, player: User) -> Optional[State]:
+        target = random_square(user.knowledge, KnowledgeSquareState.UNKNOWN)
+        result = fire_missile(target, user, player)
+        if result == FireResult.HIT:
+            return ExploreState(user, target)
+
+
+class ExploreState(State):
+    def __init__(self, user: User, centre: Vec2):
+        self.centre = centre
+        self.to_check: Iterator[Orientation] = (
+            orientation
+            for orientation in list(Orientation)
+            if square_in_board(vec_add(centre, orientation.value), user.board)
+        )
+        self.found_orientation: Optional[Orientation] = None
+        self.check_opposite: bool = False
+        self.extent = 1
+
+    def update(self, user: User, player: User) -> Optional[State]:
+        if self.found_orientation is None:
+            # Look around
+            try:
+                orientation = next(self.to_check)
+            except StopIteration:
+                return RandomState()
+            result = fire_missile(vec_add(self.centre, orientation.value), user, player)
+            match result:
+                case FireResult.HIT:
+                    self.found_orientation = orientation
+                    return None
+                case FireResult.SUNK:
+                    return RandomState()
+                case _:
+                    # Miss or Fail
+                    return None
+
+        # Fully explore the orientation
+        self.extent += 1
+        orientation = self.found_orientation
+        if self.check_opposite:
+            result = fire_missile(
+                extend(self.centre, vec_invert(orientation.value), self.extent),
+                user,
+                player,
+            )
+            match result:
+                case FireResult.MISS | FireResult.SUNK:
+                    return RandomState()
+                case FireResult.FAIL:
+                    return self.update(user, player)
+                case _:
+                    return None
+
+        result = fire_missile(
+            extend(self.centre, orientation.value, self.extent),
+            user,
+            player,
+        )
+        match result:
+            case FireResult.MISS:
+                self.check_opposite = True
+                self.extent = 0
+                return None
+            case FireResult.FAIL:
+                self.check_opposite = True
+                self.extent = 0
+                return self.update(user, player)
+            case FireResult.SUNK:
+                return RandomState()
+            case _:
+                return None
 
 
 def battleships() -> None:
     # AI ship placement
-    ai = User()
+    ai_user = User()
     for length in SHIP_LENGTHS:
         new_ship = None
         while new_ship is None:
             new_ship = new_valid_ship(
-                random_square(ai.board, SquareState.EMPTY),
+                random_square(ai_user.board, SquareState.EMPTY),
                 choice(list(Orientation)),
                 length,
-                ai,
+                ai_user,
             )
 
     # Player ship placement
@@ -204,7 +293,7 @@ def battleships() -> None:
     [new_valid_ship(s[0], s[1], s[2], player) for s in ships]
     available_ship_lengths = []
     # ----------------- END TEST -------------
-    default_boards = [ai.board, player.knowledge, player.board]
+    default_boards = [ai_user.board, player.knowledge, player.board]
     while len(available_ship_lengths) > 0:
         display_boards(*default_boards)
 
@@ -239,7 +328,7 @@ def battleships() -> None:
             )
 
     # Main game loop
-    ai_state: AIState = RandomState()
+    ai_state: State = RandomState()
     while True:
         # Player turn
         result = FireResult.FAIL
@@ -250,7 +339,7 @@ def battleships() -> None:
             if square is None:
                 print_message("Error: invalid square", *default_boards)
                 continue
-            result = fire_missile(square, player, ai)
+            result = fire_missile(square, player, ai_user)
             match result:
                 case FireResult.SUNK:
                     print_message("Enemy: You sunk my battleship!", *default_boards)
@@ -262,7 +351,7 @@ def battleships() -> None:
                     print_message("Error: Already fired there", *default_boards)
 
         # AI turn
-        state = ai_state.update(ai, player)
+        state = ai_state.update(ai_user, player)
         if state is not None:
             ai_state = state
 
@@ -271,7 +360,7 @@ def battleships() -> None:
             display_boards(*default_boards)
             input("You LOST! Press enter...")
             break
-        if all(ship.sunk for ship in ai.ships):
+        if all(ship.sunk for ship in ai_user.ships):
             display_boards(*default_boards)
             input("You WON! Press enter...")
             break
