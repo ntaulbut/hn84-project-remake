@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from battleships import SquareState, new_board, decode_notation
+from battleships import SquareState, new_board, square_in_board, decode_notation
 from vec2 import Vec2
 
 
@@ -11,6 +11,14 @@ class Test(TestCase):
             [SquareState.EMPTY, SquareState.EMPTY],
             [SquareState.EMPTY, SquareState.EMPTY],
         ]
+
+    def test_square_in_board(self):
+        board = new_board(SquareState.EMPTY, 5, 10)
+        assert square_in_board(Vec2(0, 0), board)
+        assert square_in_board(Vec2(9, 4), board)
+        assert not square_in_board(Vec2(5, 10), board)
+        assert not square_in_board(Vec2(10, 0), board)
+        assert not square_in_board(Vec2(0, 5), board)
 
     def test_decode_notation(self):
         board = new_board(SquareState.EMPTY, 7, 7)
