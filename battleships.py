@@ -288,20 +288,6 @@ def battleships() -> None:
     # Player ship placement
     player = User()
     available_ship_lengths = SHIP_LENGTHS
-    # --------------- TEST ----------
-    ships: list[tuple[Vec2, Orientation, int]] = [
-        (Vec2(1, 1), Orientation.E, 2),
-        (Vec2(1, 3), Orientation.E, 3),
-        (Vec2(4, 5), Orientation.E, 4),
-        (Vec2(9, 2), Orientation.S, 5),
-        (Vec2(0, 7), Orientation.S, 3),
-    ]
-    for ship in ships:
-        new_ship = new_valid_ship(ship[0], ship[1], ship[2], player)
-        player.ships.append(new_ship)
-        place_ship(new_ship, player.board)
-    available_ship_lengths = []
-    # ----------------- END TEST -------------
     boards = [player.knowledge, player.board]
     while len(available_ship_lengths) > 0:
         display_boards(player)
